@@ -21,8 +21,8 @@ class Sim(object):
 
         self.prepare_simulator()
 
-        self.L = self.wn // 3  # wn // 2 # Desplazamiento
-        self.L_reward = self.wn//2 # Distancia a reward
+        self.L = self.wn // 2  # wn // 2 # Desplazamiento
+        self.L_reward = 12.0#self.wn//2 # Distancia a reward
 
         self.reward = False
 
