@@ -115,6 +115,7 @@ def vf_data_generator(dir_with_src_images, base_image_filename, object_image_lis
         # print(w, " - ", wo)
         x = np.random.randint(low=0, high=w - wn)  # +wo
         y = np.random.randint(low=(60 / ratio_h), high=h - hn - (30 / ratio_h))
+        # y = np.random.randint(18, high=h - hn - (30 / ratio_h))
         objects_pos.append((x, y))
 
     L = wn // 3 # wn // 2
@@ -132,6 +133,7 @@ def vf_data_generator(dir_with_src_images, base_image_filename, object_image_lis
 
         batch_actions = np.zeros((batch_size, 1), dtype=np.float32)
         batch_rewards = np.zeros((batch_size, 1), dtype=np.float32)
+        batch_new_rewards = np.zeros((batch_size, 1), dtype=np.float32)
         ultimo_reward = 0
         for i in range(0, batch_size):
 
@@ -139,46 +141,83 @@ def vf_data_generator(dir_with_src_images, base_image_filename, object_image_lis
 
             # TODO: randomly place the objects:
             if replace_robots:
-                for ix, o in enumerate(resized_objects):
-                    a = np.random.uniform(-180, 180)
-                    o_rot = random_rotation(o, angle=a - 90)  # +90 since robot is sideways
-                    # if ix == 1:
-                    #    batch_actions[i] = a / 180
-                    ho, wo, cho = o_rot.shape
+                if i%5 == 0:
+                    for ix, o in enumerate(resized_objects):
+                        a = np.random.uniform(-180, 180)
+                        o_rot = random_rotation(o, angle=a - 90)  # +90 since robot is sideways
+                        # if ix == 1:
+                        #    batch_actions[i] = a / 180
+                        ho, wo, cho = o_rot.shape
 
-                    x = np.random.randint(low=0, high=w - wo)  # +wo
-                    # print((100 / ratio_h))
-                    # 30 is the magic number to limit the random placement of objects inside image
-                    y = np.random.randint(low=(60 / ratio_h), high=h - ho - (30 / ratio_h))
+                        x = np.random.randint(low=0, high=w - wo)  # +wo
+                        # print((100 / ratio_h))
+                        # 30 is the magic number to limit the random placement of objects inside image
+                        y = np.random.randint(low=(60 / ratio_h), high=h - ho - (30 / ratio_h))
+                        # y = np.random.randint(18, high=h - ho - (30 / ratio_h))
 
-                    xg = x - (wo // 2)
-                    yg = y - (ho // 2)
+                        xg = x - (wo // 2)
+                        yg = y - (ho // 2)
 
-                    if xg + wo > w:
-                        xg = w - wo
-                    if yg + ho > h:
-                        yg = h - ho
-                    if xg < 0:
-                        xg = 0
-                    if yg < 0:
-                        yg = 0
+                        if xg + wo > w:
+                            xg = w - wo
+                        if yg + ho > h:
+                            yg = h - ho
+                        if xg < 0:
+                            xg = 0
+                        if yg < 0:
+                            yg = 0
 
-                    x = xg + (wo // 2)
-                    y = yg + (ho // 2)
+                        x = xg + (wo // 2)
+                        y = yg + (ho // 2)
 
-                    objects_pos[ix] = (x, y)
-                    rotated_objs[ix] = o_rot
+                        objects_pos[ix] = (x, y)
+                        rotated_objs[ix] = o_rot
 
-                replace_robots = False
+                    # replace_robots = False
+                else:
+                    for ix, o in enumerate(resized_objects):
+                        if ix == 1:
+                            a = np.random.uniform(-180, 180)
+                            o_rot = random_rotation(o, angle=a - 90)  # +90 since robot is sideways
+                            # if ix == 1:
+                            #    batch_actions[i] = a / 180
+                            ho, wo, cho = o_rot.shape
+
+                            # x = np.random.randint(low=0, high=w - wo)  # +wo
+                            x = np.random.randint(low=0, high=60)  # +wo
+                            # print((100 / ratio_h))
+                            # 30 is the magic number to limit the random placement of objects inside image
+                            # y = np.random.randint(low=(60 / ratio_h), high=h - ho - (30 / ratio_h))
+                            y = np.random.randint(8, high=60)
+
+                            xg = x - (wo // 2)
+                            yg = y - (ho // 2)
+
+                            if xg + wo > w:
+                                xg = w - wo
+                            if yg + ho > h:
+                                yg = h - ho
+                            if xg < 0:
+                                xg = 0
+                            if yg < 0:
+                                yg = 0
+
+                            x = xg + (wo // 2)
+                            y = yg + (ho // 2)
+
+                            objects_pos[ix] = (x, y)
+                            rotated_objs[ix] = o_rot
             else:
                 # move the robot into random orientation with fixed direction
                 # imwrite("tmp/{}.png".format("obj_generated_" + str(i)),  o_rot)
                 robot_object_distance = h + w
                 for ix, o in enumerate(resized_objects):
                     if ix == 1:  # only do this for the robot and not the object
+                    # if ix == 2:  # only do this for the robot and not the object Para 2 objetos
 
                         x, y = objects_pos[ix]
                         x_t, y_t = objects_pos[ix - 1]
+                        # x_t, y_t = objects_pos[ix - 2] # Para objeto rojo con 2 objetos
                         # select angle towards the object in 10% of the time
                         if np.random.random() <= P_greed:
                             a = np.arctan2(x_t - x, y_t - y)
@@ -260,6 +299,12 @@ def vf_data_generator(dir_with_src_images, base_image_filename, object_image_lis
                 batch_inputs[i][yg:yg + ho, xg:xg + wo, 2] = batch_inputs[i][yg:yg + ho, xg:xg + wo, 2] * (
                             1 - mask) + mask * o_rot[:, :, 2]  # *255.0
 
+                x, y = objects_pos[0]
+                # x_t, y_t = objects_pos[1]
+                x_t, y_t = objects_pos[ix - 2] # Para 2 objetos
+                robot_object_distance = np.sqrt((x - x_t) ** 2 + (y - y_t) ** 2)
+                batch_new_rewards[i] = max(min(1.0, (50-robot_object_distance)/(50-L)), 0)
+
             # imwrite("tmp/{}.png".format("in_generated_" + str(i)),  batch_inputs[i])
             np.copyto(batch_outputs[(i - 1) % batch_size], batch_inputs[i])
             # imwrite("tmp/{}.png".format("out_generated_" + str(i)),  batch_outputs[i])
@@ -336,7 +381,8 @@ def vf_data_generator(dir_with_src_images, base_image_filename, object_image_lis
         # print(batch_actions.shape)
         if 'wmse' in loss:
             # yield [batch_inputs, batch_masks, batch_actions, batch_rewards], batch_outputs  # , batch_actions, batch_masks
-            yield batch_inputs, batch_rewards  # , batch_actions, batch_masks
+            # yield batch_inputs, batch_rewards  # , batch_actions, batch_masks
+            yield batch_inputs, batch_new_rewards
         else:
             yield [batch_inputs, batch_actions], batch_outputs
 
@@ -560,7 +606,7 @@ def brownian_data_generator(dir_with_src_images, base_image_filename, object_ima
 
                 tmp = cdist(batch_median[0], batch_inputs[i], keepdims=True) # color distance between images
                 mask = (tmp > threshold*max_cdist).astype(float)
-                batch_masks[i] = mask * obj_attention
+                batch_masks[i] = batch_median[0]-batch_inputs[i]#mask * obj_attention
                 #back_mask = ( tmp <= 0 ).astype(float) + back_attention
 
                 #batch_masks[i][batch_masks[i] > 0.5] += 0.1
@@ -612,8 +658,8 @@ def brownian_data_generator(dir_with_src_images, base_image_filename, object_ima
         #    yield [batch_inputs, np.repeat(np.array([batch_median]), batch_size, axis=0).reshape((batch_size, h, w, 3))], batch_outputs
         #print(batch_actions.shape)
         if 'wmse' in loss:
-            # yield [batch_inputs, batch_masks, batch_actions], batch_outputs # , batch_actions, batch_masks
-            yield [batch_inputs, batch_masks], batch_inputs
+            yield [batch_inputs, batch_masks, batch_actions], batch_outputs # , batch_actions, batch_masks
+            # yield [batch_inputs, batch_masks], batch_inputs
         else:
             yield [batch_inputs, batch_actions], batch_outputs
 
@@ -696,7 +742,7 @@ def brownian_data_generator_corregido(dir_with_src_images, base_image_filename, 
     # print("L: ", L)
     a = 0
     replace_robots = True
-    P_greed = 1. / 2.  # 1 / 20. #1 / 33. # Probabilidad de ir directo al goal
+    P_greed = 0.3#1. / 2.  # 1 / 20. #1 / 33. # Probabilidad de ir directo al goal
 
     iteration = -1
 
@@ -752,9 +798,12 @@ def brownian_data_generator_corregido(dir_with_src_images, base_image_filename, 
                 robot_object_distance = h + w
                 for ix, o in enumerate(resized_objects):
                     if ix == 1:  # only do this for the robot and not the object
+                    # if ix == 2:  # only do this for the robot and not the object Con 2 objetos
 
                         x, y = objects_pos[ix]
                         x_t, y_t = objects_pos[ix - 1]
+                        # x_t, y_t = objects_pos[ix - 2] # Con 2 objetos
+
                         # select angle towards the object in 10% of the time
                         if np.random.random() <= P_greed:
                             a = np.arctan2(x_t - x, y_t - y)
@@ -838,7 +887,7 @@ def brownian_data_generator_corregido(dir_with_src_images, base_image_filename, 
                 # tmp = cdist(batch_median[0], batch_inputs[i], keepdims=True)  # color distance between images
                 tmp = cdist(base_image, batch_inputs[i], keepdims=True)  # color distance between images
                 mask = (tmp > threshold * max_cdist).astype(float)
-                batch_masks[i] = mask * obj_attention
+                batch_masks[i] = mask * obj_attention # base_image-batch_inputs[i]
                 # back_mask = ( tmp <= 0 ).astype(float) + back_attention
 
                 # batch_masks[i][batch_masks[i] > 0.5] += 0.1
@@ -910,12 +959,12 @@ def brownian_data_generator_corregido(dir_with_src_images, base_image_filename, 
             # #     batch_masks[i] = new_batch_masks[-1]
             # #     batch_actions[i] = new_batch_actions[-1]
             # #     batch_outputs[i] = new_batch_outputs[-1]
-            # for i in range(1, len(batch_outputs)):
-            #     if batch_actions[i][0] == 0.:
-            #         batch_inputs[i-1] = batch_inputs[i-2]
-            #         batch_masks[i-1] = batch_masks[i-2]
-            #         batch_actions[i] = batch_actions[i-1]
-            #         batch_outputs[i-1] = batch_outputs[i-2]
+            for i in range(1, len(batch_outputs)):
+                if batch_actions[i][0] == 0.:
+                    batch_inputs[i-1] = batch_inputs[i-2]
+                    batch_masks[i-1] = batch_masks[i-2]
+                    batch_actions[i] = batch_actions[i-1]
+                    batch_outputs[i-1] = batch_outputs[i-2]
             yield [batch_inputs, batch_masks, batch_actions], batch_outputs  # , batch_actions, batch_masks
             # yield [batch_inputs, batch_masks], batch_inputs
         else:
@@ -1032,7 +1081,7 @@ def random_data_generator(dir_with_src_images, base_image_filename, object_image
                 
                 tmp = cdist(batch_median[0], batch_inputs[i], keepdims=True) # color distance between images
                 mask = (tmp > threshold*max_cdist).astype(float)
-                batch_masks[i] = mask * obj_attention
+                batch_masks[i] = mask * obj_attention #batch_median[0]-batch_inputs[i]#
                 #back_mask = ( tmp <= 0 ).astype(float) + back_attention
 
                 #batch_masks[i][batch_masks[i] > 0.5] += 0.1
@@ -1082,8 +1131,8 @@ def random_data_generator(dir_with_src_images, base_image_filename, object_image
         #if 'wmse' in loss and 'out-median' in mode:
         #    yield [batch_inputs, np.repeat(np.array([batch_median]), batch_size, axis=0).reshape((batch_size, h, w, 3))], batch_outputs
         if 'wmse' in loss:
-            # yield [batch_inputs, batch_masks], batch_outputs
-            yield [batch_inputs, batch_inputs], batch_outputs
+            yield [batch_inputs, batch_masks], batch_outputs
+            # yield [batch_inputs, batch_inputs], batch_outputs
         else:
             yield batch_inputs, batch_outputs
 
@@ -1200,17 +1249,17 @@ if __name__ == '__main__':
     base_image = 'median_image.png'#'median_image.png'
     # object_images = ['circle.png', 'robo.png'] # circle in the first place, as robo can be drawn over it
     object_images = ['circle-red.png', 'robo-green.png']
-    fitting_generator = random_data_generator(dir_with_src_images, base_image, object_images, img_shape=img_shape)
+    # fitting_generator = brownian_data_generator_corregido(dir_with_src_images, base_image, object_images, img_shape=img_shape)
 
-    # fitting_generator = vf_data_generator(dir_with_src_images, base_image, object_images, img_shape=img_shape, p_goal=1.0)
+    fitting_generator = vf_data_generator(dir_with_src_images, base_image, object_images, batch_size=1000, img_shape=img_shape, p_goal=1.0)
 
 
     #fitting_generator.__next__()
 
     c = 0
-    # for x_in, x_out in fitting_generator:
+    for x_in, x_out in fitting_generator:
     # for [x_in, batch_masks, batch_actions], x_out in fitting_generator:
-    for [x_in, batch_masks], x_out in fitting_generator:
+    # for [x_in, batch_masks], x_out in fitting_generator:
         print(type(x_in), len(x_in))
         print(x_out.shape)
         c += 1
@@ -1264,3 +1313,8 @@ if __name__ == '__main__':
     #     plt.imshow(x_out[i])
     #     ax = plt.subplot(3, 1, 3)
     #     plt.imshow(batch_masks[i])
+
+    # fig = plt.figure()
+    # plt.plot(np.sort(x_out, axis=None))
+    # plt.grid()
+    # plt.title('Distribución de valores entrenamiento VF')
