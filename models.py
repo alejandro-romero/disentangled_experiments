@@ -51,11 +51,11 @@ def make_forward_model(latent_size, action_size=1, learn_only_difference=False):
     #print(flat_layer.output_shape)
 
     x = merged
-    x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='relu')(x)
+    x = Dense(dense_size/2, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='sigmoid')(x)
     #x = Dropout(0.2)(x)
-    x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='relu')(x)
-    x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='relu')(x)
-    x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='relu')(x)
+    # x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='sigmoid')(x)
+    # x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='sigmoid')(x)
+    x = Dense(dense_size/2, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='sigmoid')(x)
     x = Dense(dense_size, kernel_initializer=normal, kernel_regularizer=kernel_regularizer, bias_initializer='ones', activation='sigmoid')(x)
     #x = Dropout(0.2)(x)
     #if learn_only_difference:
