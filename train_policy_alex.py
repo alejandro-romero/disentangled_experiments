@@ -255,4 +255,104 @@ if __name__ == "__main__":
             plt.close('all')
     plt.close('all')
     print(f"Intentos: {intentos} / Exitos: {exitos}. % exito: {exitos*100/intentos:.2f}%")
+
+    total = 0
+    for i in range(len(latent_t_array)):
+        total += len(latent_t_array[i])
+    print("Total datos:",total)
+
+    # Convierto matrices en un array de una dimension
+    in_data = []
+    for i in range(len(latent_t_array)):
+        for j in range(len(latent_t_array[i])):
+            in_data.append(latent_t_array[i][j][0])
+    in_data = np.array(in_data)
+    in_data1, in_data2, in_data3, in_data_valid = np.split(in_data, 4)
+    in_data_train = np.concatenate((in_data1, in_data2, in_data3))
+
+    out_data = []
+    for i in range(len(action_t_array)):
+        for j in range(len(action_t_array[i])):
+            out_data.append(action_t_array[i][j])
+    out_data = np.array(out_data)/180
+    out_data1, out_data2, out_data3, out_data_valid = np.split(out_data, 4)
+    out_data_train = np.concatenate((out_data1, out_data2, out_data3))
+
+    policy = KerasNN()
+
+    # Train Policy
+    batch_size = 2*1000
+    batches_per_epoch = 100
+    num_iterations = num_epochs * batches_per_epoch
+    iterations = 0
+    history = []
+    val_history = []
+
+    num_epochs = 2*500#100
+    load_policy = False
+    if load_policy:
+        policy.load_model('trained_models/policy_model_{}.h5'.format(experiment_label))
+    else:
+        history = policy.train(input_data=in_data_train, output_data=out_data_train, batch_size=100, epochs=num_epochs,
+                           validation_data=(in_data_valid, out_data_valid))
+
+        fig = plt.figure()
+        plt.plot(history.history['loss'], color='red', label='loss')
+        plt.plot(history.history['val_loss'], color='blue', label='val_loss')
+        plt.legend()
+        # plt.show()
+        fig.savefig(
+            'snapshots/policy_loss_{}_{}.png'.format("diff" if residual_forward else "nodiff", experiment_label),
+            bbox_inches='tight')
+        policy.save_model('trained_models/policy_model_{}.h5'.format(experiment_label))
+
+    #Evaluo policy
+    n = 5000
+    from simulator import Sim
+    sim = Sim(max_iter=n)
+    # sim.restart_scenario()
+    # sim.show_image(0)
+    # sim.apply_action(90)
+    # sim.show_image(1)
+    batch_inputs = np.zeros((1, sim.h, sim.w, sim.ch), dtype=np.float32)
+    # Test VF behaviour
+    # Reinicio escenario
+    sim.restart_scenario()
+    # sim.restart_scenario() # Para generar secuencias nuevas
+    # Muestro figura
+    sim.show_image(0)
+    # sim.show_image(1)
+    # plt.savefig('trazas_experimento/fig_{}.png'.format(0), dpi=100)
+    # For n iteraciones
+    steps = 0
+    intentos = 0
+    exitos = 0
+    for i in range(1, n):
+        if i % 100 == 0:
+            print("Iterations: ", i)
+        # Pos. actual
+        actual = sim.images_history[sim.iter - 1]
+        np.copyto(batch_inputs, actual)
+        lat_actual = encoder.predict(batch_inputs)
+        # Evalua pos. futuras con VF y elijo la mejor accion
+        best_action = vf.predict(lat_actual)[0][0] * 180.0
+        # Aplico accion en robot real
+        # Actualizo pos. actual
+        sim.apply_action(best_action)
+        # Muestro figura
+        sim.show_image(sim.iter - 1)
+        # plt.savefig('trazas_experimento/fig_{}.png'.format(sim.iter - 1), dpi=100)
+        # si llego al goal reinicio el escenario
+        steps += 1
+        if sim.reward or steps == 10:
+            if sim.reward:
+                exitos += 1
+            intentos += 1
+            steps = 0
+            sim.restart_scenario()
+            sim.show_image(sim.iter - 1)
+            # plt.savefig('trazas_experimento/fig_{}.png'.format(sim.iter - 1), dpi=100)
+            plt.close('all')
+    plt.close('all')
+    print(f"Intentos: {intentos} / Exitos: {exitos}. % exito: {exitos * 100 / intentos:.2f}%")
     print("FIN")
