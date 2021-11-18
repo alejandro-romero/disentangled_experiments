@@ -105,6 +105,11 @@ def load_param_hyperparam(parameters):
     model_label = (parameters["hyperparam"]["model_label"])
     return num_epochs, batch_size, latent_size, conv_layers, num_filters, kernel_size, kernel_mult, residual_forward, train_without_ae, loss, opt, model_label
 
+def change_range(old_value, old_max, old_min, new_max, new_min):
+    old_range = (old_max - old_min)
+    new_range = (new_max - new_min)
+    new_value = (((old_value - old_min) * new_range) / old_range) + new_min
+    return new_value
 
 if __name__ == "__main__":
     # Image generator config
@@ -152,7 +157,7 @@ if __name__ == "__main__":
 
 
     candidates = 10
-    n = 5000
+    n = 7500#5000
     from simulator import Sim
 
     sim = Sim(max_iter=n)
@@ -177,6 +182,10 @@ if __name__ == "__main__":
     action_t_array = []
     trace_latent_t = []
     trace_action_t = []
+    pos_rob_array = []
+    pos_obj_array = []
+    trace_pos_rob = []
+    trace_pos_obj = []
     for i in range(1, n):
         if i%100==0:
             print("Iterations: ", i)
@@ -185,6 +194,8 @@ if __name__ == "__main__":
         np.copyto(batch_inputs, actual)
         lat_actual = encoder.predict(batch_inputs)
         trace_latent_t.append(lat_actual)
+        trace_pos_obj.append(sim.objects_pos[0])
+        trace_pos_rob.append(sim.objects_pos[1])
         # Genero acciones candidatas
         candidate_actions = np.zeros((candidates, 1), dtype=np.float32)
         for j in range(candidates):
@@ -245,8 +256,12 @@ if __name__ == "__main__":
                 exitos += 1
                 latent_t_array.append(trace_latent_t)
                 action_t_array.append(trace_action_t)
+                pos_obj_array.append(trace_pos_obj)
+                pos_rob_array.append(trace_pos_rob)
             trace_latent_t = []
             trace_action_t = []
+            trace_pos_obj = []
+            trace_pos_rob = []
             intentos += 1
             steps = 0
             sim.restart_scenario()
@@ -259,7 +274,7 @@ if __name__ == "__main__":
     total = 0
     for i in range(len(latent_t_array)):
         total += len(latent_t_array[i])
-    print("Total datos:",total)
+    print("Total datos:", total)
 
     # Convierto matrices en un array de una dimension
     in_data = []
@@ -277,6 +292,12 @@ if __name__ == "__main__":
     out_data = np.array(out_data)/180
     out_data1, out_data2, out_data3, out_data_valid = np.split(out_data, 4)
     out_data_train = np.concatenate((out_data1, out_data2, out_data3))
+
+    # Convierto valores salida a rango 0-1
+    for i in range(len(out_data_train)):
+        out_data_train[i] = change_range(out_data_train[i], 1, -1, 1, 0)
+    for i in range(len(out_data_valid)):
+        out_data_valid[i] = change_range(out_data_valid[i], 1, -1, 1, 0)
 
     policy = KerasNN()
 
@@ -335,7 +356,8 @@ if __name__ == "__main__":
         np.copyto(batch_inputs, actual)
         lat_actual = encoder.predict(batch_inputs)
         # Evalua pos. futuras con VF y elijo la mejor accion
-        best_action = vf.predict(lat_actual)[0][0] * 180.0
+        best_action = vf.predict(lat_actual)[0][0]
+        best_action = change_range(best_action, 1, 0, 1, -1)*180
         # Aplico accion en robot real
         # Actualizo pos. actual
         sim.apply_action(best_action)
